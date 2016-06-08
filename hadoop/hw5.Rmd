@@ -1,0 +1,53 @@
+---
+title: "hw5"
+author: "Yang Chen, Drew Jordan, Howard Liu, Yulin Lei"
+date: "12/7/2015"
+output: html_document
+---
+
+**Task 1**
+
+In this task, we are interested in finding the top 25 subreddits for each month and tracking their ranking from month to month. In order to complete this task, we used the R package rhipe's mapreduce framework to count how many times redditors commented on each subreddit. We set the key to "subreddit" and the value to 1 so that each time a subreddit was encountered, it's count increased by one. We then did this for each month. We then sorted the subreddits by their respective comment counts for each month and made 5 top 25 charts of these subreddits. We then tracked the ranking of each subreddit over the course of the 5 months to see if there were any noticeable trends. Here are the 5 charts:
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+library(xtable)
+load("top25_1.RData")
+load("top25_2.RData")
+load("top25_3.RData")
+load("top25_4.RData")
+load("top25_5.RData")
+options(xtable.comment=FALSE)
+```
+For January:
+```{r, echo=FALSE}
+top25_1
+```
+For February:
+```{r, echo=FALSE}
+top25_2
+```
+For March:
+```{r, echo=FALSE}
+top25_3
+```
+For April:
+```{r, echo=FALSE}
+top25_4
+```
+For May:
+```{r, echo=FALSE}
+top25_5
+```
+
+**Task 3**
+
+For this task we are interested in figuring out if redditors say different things on Valentine's Day as opposed to any other day of the year. For this analysis we will compare Valentine's Day to New Year's Day by comparing the frequency of the words used by redditors on those days. In order to complete this task, we used the mapreduce framework to count the total number of occurences of every word on both Valentine's Day and New Year's Day. After removing all stop words, we found the top ten words on Valentine's day that were outside of + or - 5,000 occurences of the same word on New Year's Day. We reasoned that words occuring within 5,000 times of each other were used in pretty much the same frequency as each other. After finding these top ten words for Valentine's Day, we then compared these word counts to the word counts of the same words on New Year's Day. We do this comparison using a bargraph:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+load("Feb14_Jan1.Rdata")
+
+# barplot
+ggplot(x, aes(x = key1, y = value1, fill = date)) +
+  geom_bar(stat = "identity", position=position_dodge()) +
+  xlab("Word") + ylab("Frequency") + ggtitle("Word Fequency for Feb14 vs. Jan1")
+```
