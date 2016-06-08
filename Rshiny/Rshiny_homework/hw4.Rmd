@@ -1,0 +1,148 @@
+---
+title: "hw4"
+author: "Yang Chen, Drew Jordan, Howard Liu, Yulin Lei"
+date: "11/13/2015"
+output: html_document
+---
+
+**Introduction**: 
+
+In this assignment we attempted to model Karl Broman's sock problem using Approximate Bayesian Computation (ABC) in a Shiny app. For this problem, we chose different priors and different parameters for these priors to show the influence that these choices make on our estimate of the number of socks and the proportion of socks that have a mate.
+
+**Number of Socks Priors**:
+
+Our choices for priors for the total number of socks were the negative binomial distribution and the binomial distribution. We chose these priors because they are both discrete and the number of socks is also a discrete variable. Both of these distributions are also always positive.
+
+**Proportion of Pairs Priors**:
+
+Our choices for priors for the proportion of socks that have pairs were the truncated normal and beta distributions. We chose these priors because they are both continuous between 0 and 1, therefore satisfying the condition that the proportion of socks must be a percentage. Here is the code we used in our app for our priors:
+
+
+        priors = reactive(
+        {
+        n_socks = numeric()
+        if (input$total_prior == "binom")
+        {
+          n_socks = rbinom(input$n_sims, input$total_n, input$total_pbinom)
+        } else {
+          n_socks = rnbinom(input$n_sims,size = input$total_r, prob = input$total_p)
+        }
+
+        prop_pairs = numeric()
+        if (input$prop_prior == "beta")
+        {
+          prop_pairs = rbeta(input$n_sims, input$prop_alpha, input$prop_beta)
+        } else {
+          prop_pairs = rtruncnorm(input$n_sims,0,1,input$prop_mu,input$prop_sigma)
+        }
+
+        data.frame(total = n_socks, prop = prop_pairs)
+        
+        }
+      
+ 
+
+**Plotting our Distributions**
+
+We then plotted all of the prior and posterior plots based on the prior and parameter selections and calculated summary statistics for each of our posterior distributions. In our app, we have checkboxes to select whether or not to display such summary statistics and the corresponding tables. Here is an example of a plot from the binomial prior for total socks that is generated in the app:
+
+```{r, echo = FALSE}
+
+n_socks = rbinom(1000, 30, .5)
+prop_pairs = rbeta(1000, 10, 2)
+prior = data.frame(total = n_socks, prop = prop_pairs)
+
+hist(prior[,1], freq=FALSE, main="Prior on n_Socks", xlab= "Number of Socks", col="green")
+        abline(v=mean(prior[,1]), lty=2,col="red", lwd=2)
+```
+Here is an example plot from the beta-binomial posterior generated in our app:
+        
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+library(shiny)
+library(parallel)
+library(truncnorm)
+
+n_socks = rbinom(1000, 30, .5)
+prop_pairs = rbeta(1000, 10, 2)
+prior = data.frame(total = n_socks, prop = prop_pairs)
+prior = as.matrix(prior)
+prior = lapply(1:NROW(prior), function(i) prior[i,,drop=FALSE]) 
+
+# prior = split(prior, 1:nrow(prior))
+
+gen_model = function(total,prop)
+{
+  
+  n_pairs <- round(floor(total / 2) * prop)
+  n_odd <- total - n_pairs * 2
+  # Simulating picking out n_picked socks
+  socks <- rep(seq_len(n_pairs + n_odd), rep(c(2, 1), c(n_pairs, n_odd)))
+  picked_socks <- sample(socks, size =  min(2+2*3
+                                            , total))
+  sock_counts <- table(picked_socks)
+  # Returning the parameters and counts of the number of matched
+  # and unique socks among those that were picked out.
+  result <- c(unique = sum(sock_counts == 1), pairs = sum(sock_counts == 2),
+              n_socks = total, n_pairs = n_pairs,
+              n_odd = n_odd, prop_pairs = prop)
+  return(result)
+}
+
+k = as.data.frame(mclapply(prior, function(x) gen_model(x[1], x[2]), mc.cores=4))
+m = k[,k["unique",] == 2 &
+             k["pairs",] == 3]
+
+hist(as.numeric(m[3,]), freq=FALSE, main="Posterior on n_socks",xlab = "Number of Socks", col="lightblue")
+```
+
+**Speed Up**
+
+Because ABC is a very inefficient computational method, we had to implement methods to enhance the speed of our app. In order to do this, we used the mclapply function in R to run our generative model on 4 cores at one time as opposed to the default 1 core. This significantly enhanced the runtime of our code and made the app way more responsive to the user's inputs. Here is an example of the time to run our code using just a regular apply function for our generative model: 
+
+```{r, echo = FALSE}
+
+n_socks = rbinom(1000000, 30, .5)
+prop_pairs = rbeta(1000000, 10, 2)
+prior = data.frame(total = n_socks, prop = prop_pairs)
+
+gen_model = function(total,prop)
+{
+  
+  n_pairs <- round(floor(total / 2) * prop)
+  n_odd <- total - n_pairs * 2
+  # Simulating picking out n_picked socks
+  socks <- rep(seq_len(n_pairs + n_odd), rep(c(2, 1), c(n_pairs, n_odd)))
+  picked_socks <- sample(socks, size =  min(2+2*3
+                                            , total))
+  sock_counts <- table(picked_socks)
+  # Returning the parameters and counts of the number of matched
+  # and unique socks among those that were picked out.
+  result <- c(unique = sum(sock_counts == 1), pairs = sum(sock_counts == 2),
+              n_socks = total, n_pairs = n_pairs,
+              n_odd = n_odd, prop_pairs = prop)
+  return(result)
+}
+```
+
+```{r, echo=TRUE}
+
+system.time(apply(prior,1, function(x) gen_model(x[1],x[2])))
+```
+Here is an example of the time to run our code using multiple cores and the mclapply function for our generative model:
+
+```{r, echo=FALSE}
+
+n_socks = rbinom(1000000,30, .5)
+prop_pairs = rbeta(1000000, 10, 2)
+prior = data.frame(total = n_socks, prop = prop_pairs)
+prior = as.matrix(prior)
+prior = lapply(1:NROW(prior), function(i) prior[i,,drop=FALSE])
+```
+
+```{r, echo=TRUE}
+
+system.time(mclapply(prior, function(x) gen_model(x[1], x[2]), mc.cores=4))
+```
+As we can see, with large enough samples, the multiple core method succeeds in reducing run time over the single core approach.
+
+Overall, Approximate Bayesian Computation seems like a valid method of addressing these kinds of problems.
